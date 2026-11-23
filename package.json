@@ -1,0 +1,15 @@
+{
+  "name": "shop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Каса и склад: POS, номенклатура, заприхождаване, рецепти и менюта",
+  "workspaces": ["server", "web"],
+  "scripts": {
+    "dev": "npm run dev -w server & npm run dev -w web",
+    "build": "npm run build -w web",
+    "start": "npm start -w server",
+    "seed": "npm run seed -w server",
+    "test": "npm test -w server"
+  },
+  "engines": { "node": ">=22.13" }
+}
