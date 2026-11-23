@@ -410,9 +410,10 @@ export function buildApp(db, { logger = false } = {}) {
 
   // ---------- web app ----------
   if (existsSync(WEB_DIST)) {
-    app.register(fastifyStatic, { root: WEB_DIST, wildcard: false });
+    app.register(fastifyStatic, { root: WEB_DIST });
     app.setNotFoundHandler((req, reply) => {
-      if (req.url.startsWith('/api/')) return reply.code(404).send({ error: 'Няма такъв адрес' });
+      const path = req.url.split('?')[0];
+      if (path.startsWith('/api/') || /\.[a-z0-9]+$/i.test(path)) return reply.code(404).send({ error: 'Няма такъв адрес' });
       return reply.sendFile('index.html');
     });
   }
