@@ -31,7 +31,7 @@ export default function Products({ user }) {
       <div className="page-head">
         <div><h1>Артикули</h1><div className="sub">Номенклатура, рецепти, комбо менюта и категории</div></div>
         <div className="grow" />
-        {tab === 'items' && <button className="btn pri" onClick={() => setEdit({ type: 'goods', unit: 'бр.', vat_group: 'Б', price: 0, sellable: 1, on_pos: 1, components: [], category_id: fCat ? Number(fCat) : null })}><Icon name="plus" />Нов артикул</button>}
+        {tab === 'items' && <button className="btn pri" onClick={() => setEdit({ type: 'goods', unit: 'бр.', vat_group: 'Б', price: 0, sellable: 1, on_pos: 1, components: [], category_id: fCat || null })}><Icon name="plus" />Нов артикул</button>}
       </div>
       <div className="tabs">
         <button className={tab === 'items' ? 'on' : ''} onClick={() => setTab('items')}>Артикули <span className="mute">{products?.length ?? ''}</span></button>
@@ -100,7 +100,7 @@ function Editor({ item, cats, products, onClose, onSaved, canDelete }) {
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e?.target ? (e.target.type === 'checkbox' ? (e.target.checked ? 1 : 0) : e.target.value) : e }));
   const byId = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products]);
   const composite = f.type === 'recipe' || f.type === 'combo';
-  const cat = cats.find((c) => c.id === Number(f.category_id));
+  const cat = cats.find((c) => c.id === f.category_id);
 
   const cost = composite ? f.components.reduce((s, c) => s + (byId[c.id]?.cost || 0) * parseNum(c.qty), 0) : Number(f.cost) || 0;
   const net = parseNum(f.price) / (1 + VAT[f.vat_group] / 100);
@@ -111,7 +111,7 @@ function Editor({ item, cats, products, onClose, onSaved, canDelete }) {
   const save = async () => {
     setBusy(true);
     try {
-      const body = { ...f, price: parseNum(f.price), min_stock: parseNum(f.min_stock), category_id: f.category_id ? Number(f.category_id) : null,
+      const body = { ...f, price: parseNum(f.price), min_stock: parseNum(f.min_stock), category_id: f.category_id || null,
         components: composite ? f.components.map((c) => ({ id: c.id, qty: parseNum(c.qty) })) : [] };
       delete body.stock; delete body.cost; delete body.updated_at;
       if (f.id) await api(`/products/${f.id}`, { method: 'PUT', body }); else await api('/products', { method: 'POST', body });

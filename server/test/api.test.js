@@ -1,23 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
-import { buildApp, hashPin } from '../src/app.js';
+import { buildApp, directCaller } from '../src/app.js';
 
 async function setup() {
   const db = openDb(':memory:');
-  db.prepare('INSERT INTO users(name, role, pin_hash) VALUES (?,?,?)').run('Админ', 'admin', hashPin('0000'));
-  db.prepare('INSERT INTO users(name, role, pin_hash) VALUES (?,?,?)').run('Касиер', 'cashier', hashPin('1111'));
+  const direct = directCaller(db);
+  const ids = [(await direct('POST', '/users', { name: 'Админ', role: 'admin', pin: '0000' })).id,
+    (await direct('POST', '/users', { name: 'Касиер', role: 'cashier', pin: '1111' })).id];
   const app = buildApp(db);
   const login = async (userId, pin) => (await app.inject({ method: 'POST', url: '/api/auth/login', payload: { userId, pin } })).json().token;
-  const admin = await login(1, '0000');
+  const admin = await login(ids[0], '0000');
   const call = (method, url, payload, token = admin) =>
     app.inject({ method, url, payload, headers: { authorization: `Bearer ${token}` } }).then((r) => ({ status: r.statusCode, body: r.json() }));
-  return { app, db, call, login };
+  return { app, db, call, login, ids };
 }
 
 test('грешен ПИН се отказва', async () => {
-  const { app } = await setup();
-  const r = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { userId: 1, pin: '9999' } });
+  const { app, ids } = await setup();
+  const r = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { userId: ids[0], pin: '9999' } });
   assert.equal(r.statusCode, 401);
 });
 
@@ -59,8 +60,8 @@ test('продажба по рецепта изписва суровините, 
 });
 
 test('касиер не може да променя артикули и да сторнира', async () => {
-  const { call, login } = await setup();
-  const cashier = await login(2, '1111');
+  const { call, login, ids } = await setup();
+  const cashier = await login(ids[1], '1111');
   assert.equal((await call('POST', '/api/products', { name: 'X' }, cashier)).status, 403);
   const p = (await call('POST', '/api/products', { name: 'Вода', price: 1 })).body;
   await call('POST', '/api/orders/pay', { uid: 'z', payment: 'card', lines: [{ product_id: p.id, qty: 1 }] }, cashier);

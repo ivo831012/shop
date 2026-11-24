@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from './Icon.jsx';
 import { eur, qty as fq } from '../lib/format.js';
+import { getStatus, onStatus, getConfig } from '../lib/device.js';
 
 // ---------- toasts ----------
 const ToastCtx = createContext(() => {});
@@ -69,6 +70,24 @@ export function Thumb({ p, cats }) {
       {p.image ? <img src={p.image} alt="" /> : <Icon name={c?.icon || 'box'} />}
     </div>
   );
+}
+
+/** Състояние на синхронизацията на устройството. */
+export function SyncBadge() {
+  const [s, setS] = useState(getStatus);
+  useEffect(() => onStatus(setS), []);
+  const cfg = getConfig();
+  if (!cfg?.owner) return <span className="net off" style={{ color: 'var(--mute)' }}><i />само на устройството</span>;
+  const text = { idle: 'свързва…', syncing: 'синхронизира…', ok: s.pending ? `чака ${s.pending}` : 'синхронизирано', offline: 'офлайн', error: 'грешка при синхронизация' }[s.state];
+  return <span className={`net ${s.state === 'ok' || s.state === 'syncing' || s.state === 'idle' ? '' : 'off'}`} title={s.message || ''}><i />{text}</span>;
+}
+
+/** Презарежда данни, когато дойдат промени от други устройства. */
+export function useDataRefresh(fn) {
+  useEffect(() => {
+    window.addEventListener('shop:data', fn);
+    return () => window.removeEventListener('shop:data', fn);
+  }, [fn]);
 }
 
 export function Empty({ icon = 'box', title, children }) {

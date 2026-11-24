@@ -1,5 +1,10 @@
 // Връзка със сървъра + локален кеш, за да работи касата и без интернет.
 import { get, set } from 'idb-keyval';
+import { getEngine } from './device.js';
+
+// Вариант „устройство“ (GitHub Pages): всичко се изпълнява локално и се синхронизира с GitHub.
+// Вариант „сървър“ (npm start): заявките отиват към сървъра.
+export const STANDALONE = import.meta.env.MODE !== 'server';
 
 let token = null;
 try { token = localStorage.getItem('shop.token'); } catch {}
@@ -13,7 +18,37 @@ export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
 }
 
+function currentUser() {
+  try { return JSON.parse(localStorage.getItem('shop.user')); } catch { return null; }
+}
+
+async function localApi(path, method, body) {
+  const engine = getEngine();
+  try {
+    if (path === '/auth/login') return { token: 'local', user: await engine.login(body.userId, body.pin) };
+    if (path === '/logout') return { ok: true };
+    const user = currentUser();
+    if (path === '/me') {
+      if (!user || !engine.userActive(user.id)) throw new ApiError('Влезте отново', 401);
+      return { user };
+    }
+    if (path === '/auth/users') return await engine.request('GET', path);
+    if (!user) throw new ApiError('Влезте отново', 401);
+    return await engine.request(method, path, body, user);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    throw new ApiError(e.message || 'Възникна грешка', e.statusCode || 500);
+  }
+}
+
 export async function api(path, { method = 'GET', body } = {}) {
+  if (STANDALONE) {
+    try { return await localApi(path, method, body); }
+    catch (e) {
+      if (e.status === 401 && path !== '/auth/login') window.dispatchEvent(new Event('shop:logout'));
+      throw e;
+    }
+  }
   let res;
   try {
     res = await fetch(`/api${path}`, {
@@ -34,6 +69,7 @@ export async function api(path, { method = 'GET', body } = {}) {
 
 // ---------- каталог за касата ----------
 export async function loadCatalog() {
+  if (STANDALONE) return { ...(await api('/catalog')), offline: false };
   try {
     const c = await api('/catalog');
     await set('catalog', c).catch(() => {});
@@ -54,6 +90,7 @@ const emit = (n) => listeners.forEach((f) => f(n));
 export async function queued() { return (await get('sales-queue').catch(() => null)) || []; }
 
 export async function paySale(sale) {
+  if (STANDALONE) return { ...(await api('/orders/pay', { method: 'POST', body: sale })), offline: false };
   try {
     return { ...(await api('/orders/pay', { method: 'POST', body: sale })), offline: false };
   } catch (e) {
@@ -68,7 +105,7 @@ export async function paySale(sale) {
 
 let flushing = false;
 export async function flushQueue() {
-  if (flushing) return;
+  if (STANDALONE || flushing) return;
   const q = await queued();
   if (!q.length) return emit(0);
   flushing = true;

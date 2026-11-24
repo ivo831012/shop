@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { eur, money, qty as fq, fmtTime, today } from '../lib/format.js';
 import Icon from '../components/Icon.jsx';
-import { Modal, Empty, useToast } from '../components/ui.jsx';
+import { Modal, Empty, useToast, useDataRefresh } from '../components/ui.jsx';
 
 export default function Reports() {
   const toast = useToast();
@@ -15,6 +15,7 @@ export default function Reports() {
   const load = () => Promise.all([api(`/reports/day?date=${date}`), api(`/orders?date=${date}`)])
     .then(([a, b]) => { setR(a); setOrders(b); }).catch((e) => toast(e.message, 'err'));
   useEffect(() => { load(); }, [date]);
+  useDataRefresh(useCallback(() => load(), [date]));
 
   const shift = (d) => { const x = new Date(date); x.setDate(x.getDate() + d); setDate(x.toLocaleDateString('sv-SE')); };
   const hours = Array.from({ length: 17 }, (_, i) => i + 6);

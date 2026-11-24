@@ -3,13 +3,23 @@
   "private": true,
   "version": "0.1.0",
   "description": "Каса и склад: POS, номенклатура, заприхождаване, рецепти и менюта",
-  "workspaces": ["server", "web"],
+  "workspaces": [
+    "core",
+    "server",
+    "web"
+  ],
   "scripts": {
-    "dev": "npm run dev -w server & npm run dev -w web",
+    "dev": "npm run dev -w server & npm run dev -w web -- --mode server",
     "build": "npm run build -w web",
+    "build:server": "npm run build:server -w web",
     "start": "npm start -w server",
     "seed": "npm run seed -w server",
-    "test": "npm test -w server"
+    "test": "node --no-warnings --test core/test/*.test.js server/test/*.test.js"
   },
-  "engines": { "node": ">=22.13" }
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "sql.js": "^1.13.0"
+  }
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api.js';
+import { api, STANDALONE } from '../lib/api.js';
+import { getConfig, getStatus, onStatus, syncNow, resetDevice } from '../lib/device.js';
+import { fmtTime } from '../lib/format.js';
 import Icon from '../components/Icon.jsx';
 import { Field, useToast } from '../components/ui.jsx';
 
@@ -66,6 +68,8 @@ export default function Settings({ logout }) {
             </div>
           </div>
         </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {STANDALONE && <DeviceCard />}
         <div className="card">
           <h3>Маси <span className="mute" style={{ fontWeight: 500, fontSize: 13 }}>{tables.length}</span></h3>
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -87,7 +91,34 @@ export default function Settings({ logout }) {
             </div>
           ))}
         </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function DeviceCard() {
+  const cfg = getConfig() || {};
+  const [s, setS] = useState(getStatus);
+  const [confirm, setConfirm] = useState(false);
+  useEffect(() => onStatus(setS), []);
+  const row = (k, v) => <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14, padding: '5px 0' }}><span className="mute">{k}</span><span style={{ textAlign: 'right', minWidth: 0, overflowWrap: 'anywhere' }}>{v}</span></div>;
+  return (
+    <div className="card">
+      <h3>Това устройство</h3>
+      {row('Име', cfg.deviceName || '—')}
+      {cfg.owner ? <>
+        {row('Хранилище', `${cfg.owner}/${cfg.repo}`)}
+        {row('Синхронизация', s.state === 'ok' ? `успешна в ${fmtTime(new Date(s.at).toISOString().replace('T', ' ').slice(0, 19))}` : s.state === 'syncing' ? 'в момента…' : s.message || '—')}
+        {row('Неизпратени операции', s.pending || 0)}
+      </> : row('Синхронизация', 'няма, само на това устройство')}
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        {cfg.owner && <button className="btn sm" onClick={syncNow}><Icon name="undo" />Синхронизирай сега</button>}
+        {confirm
+          ? <><button className="btn danger sm" onClick={resetDevice}>Да, изключи</button><button className="btn ghost sm" onClick={() => setConfirm(false)}>Не</button></>
+          : <button className="btn ghost sm" onClick={() => setConfirm(true)}>Изключи устройството</button>}
+      </div>
+      {confirm && <p className="mute" style={{ fontSize: 12.5, margin: '10px 0 0' }}>{cfg.owner ? `Базата на това устройство ще се изтрие. Данните в GitHub остават${s.pending ? `, но ${s.pending} неизпратени операции ще се загубят` : ''}.` : 'Всички данни на това устройство ще се изтрият.'}</p>}
     </div>
   );
 }

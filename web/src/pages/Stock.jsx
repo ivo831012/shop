@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import { eur, money, dec, qty as fq, parseNum, fmtDate, today } from '../lib/format.js';
 import Icon from '../components/Icon.jsx';
-import { Field, Thumb, Empty, ProductPicker, useToast } from '../components/ui.jsx';
+import { Field, Thumb, Empty, ProductPicker, useToast, useDataRefresh } from '../components/ui.jsx';
 
 const DOC = {
   delivery: { label: 'Доставка', many: 'Доставки', verb: 'Заприходи', priceLabel: 'Доставна цена', hint: 'Увеличава наличността и обновява средната доставна цена.' },
@@ -23,6 +23,7 @@ export default function Stock() {
   const load = () => Promise.all([api('/stock'), api('/categories'), api('/documents')])
     .then(([s, c, d]) => { setStock(s); setCats(c); setDocs(d); }).catch((e) => toast(e.message, 'err'));
   useEffect(() => { load(); }, []);
+  useDataRefresh(useCallback(() => load(), []));
 
   const low = (p) => p.min_stock > 0 && p.stock < p.min_stock;
   const list = useMemo(() => {

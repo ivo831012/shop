@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, auth } from './lib/api.js';
+import { api, auth, STANDALONE } from './lib/api.js';
+import { getConfig, startEngine } from './lib/device.js';
+import Connect from './pages/Connect.jsx';
 import { initials, ROLE } from './lib/format.js';
 import Icon from './components/Icon.jsx';
 import Login from './pages/Login.jsx';
@@ -22,15 +24,22 @@ const PAGES = [
 export default function App() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
+  const [device, setDevice] = useState(() => (STANDALONE ? (getConfig() ? 'loading' : 'none') : 'ok'));
   const [page, setPage] = useState(() => location.hash.slice(1) || 'pos');
 
   useEffect(() => {
+    if (device !== 'loading') return;
+    startEngine().then(() => setDevice('ok')).catch(() => setDevice('error'));
+  }, [device]);
+
+  useEffect(() => {
+    if (device !== 'ok') return;
     if (!auth.token) return setReady(true);
     api('/me').then((r) => setUser(r.user)).catch((e) => {
       // без връзка: пазим последния потребител, за да може касата да работи офлайн
       if (!e.status) { try { setUser(JSON.parse(localStorage.getItem('shop.user'))); } catch {} }
     }).finally(() => setReady(true));
-  }, []);
+  }, [device]);
 
   const logout = useCallback(() => {
     api('/logout', { method: 'POST' }).catch(() => {});
@@ -49,6 +58,8 @@ export default function App() {
     return () => window.removeEventListener('hashchange', h);
   }, []);
 
+  if (device === 'none') return <Connect onReady={() => setDevice('loading')} />;
+  if (device === 'error') return <div className="login"><div className="pad">Базата на това устройство не може да се зареди. Презаредете страницата.</div></div>;
   if (!ready) return null;
   if (!user) return <Login onLogin={(u) => { setUser(u); try { localStorage.setItem('shop.user', JSON.stringify(u)); } catch {} }} />;
 

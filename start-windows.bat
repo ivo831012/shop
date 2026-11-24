@@ -10,7 +10,7 @@ if errorlevel 1 (
 echo Инсталиране на нужните пакети...
 call npm install || goto :err
 echo Подготовка на интерфейса...
-call npm run build || goto :err
+call npm run build:server || goto :err
 call npm run seed
 echo.
 echo Готово. Отворете в браузъра: http://localhost:3000

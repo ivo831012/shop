@@ -1,12 +1,12 @@
 // Пази приложението локално, за да се отваря и без интернет. API заявките не се кешират тук.
-const CACHE = 'shop-v1';
+const CACHE = 'shop-v2';
 self.addEventListener('install', (e) => { self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.pathname.startsWith('/api/')) return;
+  if (e.request.method !== 'GET' || url.pathname.includes('/api/') || url.hostname === 'api.github.com') return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {
@@ -16,6 +16,6 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || (e.request.mode === 'navigate' ? caches.match('/') : undefined)))
+      .catch(() => caches.match(e.request).then((r) => r || (e.request.mode === 'navigate' ? caches.match(new URL('./', self.registration.scope).href) : undefined)))
   );
 });

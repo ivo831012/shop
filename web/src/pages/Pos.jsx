@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, loadCatalog, paySale, flushQueue, queued, onQueue, uid } from '../lib/api.js';
+import { api, loadCatalog, paySale, flushQueue, queued, onQueue, uid, STANDALONE } from '../lib/api.js';
 import { eur, money, round2, parseNum, catColor, VAT, fmtTime } from '../lib/format.js';
 import Icon from '../components/Icon.jsx';
-import { Modal, Empty, useToast } from '../components/ui.jsx';
+import { Modal, Empty, useToast, SyncBadge, useDataRefresh } from '../components/ui.jsx';
 
 const KIND = [['here', 'На място'], ['takeaway', 'За вкъщи'], ['delivery', 'Доставка']];
 const newOrder = () => ({ uid: uid(), kind: 'here', table_id: null, lines: [], saved: false, number: null });
@@ -11,7 +11,7 @@ export default function Pos({ user }) {
   const toast = useToast();
   const [cat, setCat] = useState(null);
   const [catalog, setCatalog] = useState(null);
-  const [filter, setFilter] = useState(-1);
+  const [filter, setFilter] = useState(null);
   const [search, setSearch] = useState('');
   const [order, setOrder] = useState(newOrder);
   const [modal, setModal] = useState(null); // 'pay' | 'tables' | 'open'
@@ -27,6 +27,7 @@ export default function Pos({ user }) {
 
   useEffect(() => { reload(); refreshOpen(); queued().then((q) => setPending(q.length)); }, [reload, refreshOpen]);
   useEffect(() => onQueue(setPending), []);
+  useDataRefresh(useCallback(() => { reload(); refreshOpen(); }, [reload, refreshOpen]));
   useEffect(() => {
     const up = () => { setOnline(true); flushQueue(); reload(); };
     const down = () => setOnline(false);
@@ -47,7 +48,7 @@ export default function Pos({ user }) {
   const shown = useMemo(() => {
     const s = search.trim().toLowerCase();
     if (s) return sellable.filter((p) => p.name.toLowerCase().includes(s) || p.barcode === s || p.code?.toLowerCase() === s);
-    if (filter >= 0) return onPos.filter((p) => p.category_id === filter);
+    if (filter) return onPos.filter((p) => p.category_id === filter);
     const rank = Object.fromEntries(cats.map((c, i) => [c.id, i]));
     return [...onPos].sort((a, b) => (rank[a.category_id] ?? 999) - (rank[b.category_id] ?? 999) || a.sort - b.sort || a.name.localeCompare(b.name, 'bg'));
   }, [search, filter, onPos, sellable, cats]);
@@ -161,7 +162,7 @@ export default function Pos({ user }) {
         <div className="pos-top">
           <div>
             <h1>Продажба</h1>
-            <div className="sub">{user.name} · <span className={`net ${online ? '' : 'off'}`}><i />{online ? (pending ? `изпраща ${pending}` : 'на линия') : 'офлайн'}</span></div>
+            <div className="sub">{user.name} · {STANDALONE ? <SyncBadge /> : <span className={`net ${online ? '' : 'off'}`}><i />{online ? (pending ? `изпраща ${pending}` : 'на линия') : 'офлайн'}</span>}</div>
           </div>
           <label className="scan">
             <Icon name="barcode" />
@@ -177,7 +178,7 @@ export default function Pos({ user }) {
         </div>
         {!search && (
           <div className="cats">
-            <button className={`chip ${filter < 0 ? 'on' : ''}`} onClick={() => setFilter(-1)}>Всички <em>{onPos.length}</em></button>
+            <button className={`chip ${!filter ? 'on' : ''}`} onClick={() => setFilter(null)}>Всички <em>{onPos.length}</em></button>
             {visibleCats.map((c) => (
               <button key={c.id} className={`chip ${filter === c.id ? 'on' : ''}`} onClick={() => setFilter(c.id)} style={{ '--c': catColor(c.color) }}>
                 <span className="dot" />{c.name} <em>{onPos.filter((p) => p.category_id === c.id).length}</em>
